@@ -65,11 +65,11 @@ Add user) або через `auth.admin` з service_role ключем. Реєс�
 
 Cloudflare Zero Trust → Tunnels → новий public hostname:
 
-- **Hostname:** `api.<домен>` (той самий, що піде у `VITE_SUPABASE_URL`)
+- **Hostname:** `salary-api.erp-ubpukraine.com` (він же йде у `VITE_SUPABASE_URL`)
 - **Service:** `http://<IP_VM>:49000` — без шляху й без слеша в кінці
 
-Після того, як домен резолвиться, розкоментувати `[api].external_url` і
-`[auth].jwt_issuer` у `config.toml` і перезапустити:
+Домен уже піднято, тож `external_url` і `jwt_issuer` у `config.toml` заповнені.
+Після зміни конфігу стек треба перезапустити:
 
 ```bash
 npx supabase stop && npx supabase start

@@ -25,9 +25,8 @@ schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 # Публічний HTTPS URL API (Kong за Cloudflare Tunnel → http://10.18.10.50:49000).
-# Розкоментувати ПІСЛЯ того, як тунель піднято і домен резолвиться: `supabase start`
-# робить по цьому URL health-check і без живого домену гасить контейнери.
-# external_url = "https://api.<домен>"
+# Домен уже піднятий, тож health-check при `supabase start` пройде.
+external_url = "https://salary-api.erp-ubpukraine.com"
 
 [api.tls]
 enabled = false
@@ -92,8 +91,7 @@ additional_redirect_urls = [
 ]
 jwt_expiry = 3600
 # Issuer посилань Auth (recovery/verify). Той самий api-домен за тунелем.
-# Розкоментувати разом із external_url.
-# jwt_issuer = "https://api.<домен>/auth/v1"
+jwt_issuer = "https://salary-api.erp-ubpukraine.com/auth/v1"
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_signup = true
