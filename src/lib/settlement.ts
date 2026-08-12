@@ -77,7 +77,9 @@ export function computeSettlement(
   const bugfix = Number(config.bugfix_amount) || 0;
   const total = fix + bugfix + projects;
 
-  const active = participants.filter((p) => p.active);
+  // Лише ті, хто справді ділить котел: апрувер із часткою 0 у виплатах ні до чого —
+  // рядок із суцільними нулями лише засмічував таблицю.
+  const active = participants.filter((p) => p.active && Number(p.share) > 0);
   // Частки нормалізуємо: якщо в базі не рівно 1 (когось вимкнули), котел усе
   // одно має розійтись повністю, а не «загубити» решту.
   const shareSum = active.reduce((s, p) => s + (Number(p.share) || 0), 0) || 1;
