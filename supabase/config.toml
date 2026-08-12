@@ -24,9 +24,10 @@ port = 49000
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
-# Публічний HTTPS URL API (Kong за Cloudflare Tunnel `api-ubp` → http://10.18.10.50:49000).
-# Домен активний і резолвиться, тож health-check при `supabase start` пройде.
-external_url = "https://api.erp-ubpukraine-pay.com"
+# Публічний HTTPS URL API (Kong за Cloudflare Tunnel → http://10.18.10.50:49000).
+# Розкоментувати ПІСЛЯ того, як тунель піднято і домен резолвиться: `supabase start`
+# робить по цьому URL health-check і без живого домену гасить контейнери.
+# external_url = "https://api.<домен>"
 
 [api.tls]
 enabled = false
@@ -81,19 +82,18 @@ enabled = false
 
 [auth]
 enabled = true
-# Базовий URL ФРОНТА (де відкривається застосунок). Наразі — Cloudflare Worker.
-site_url = "https://payments-app.crm-a10.workers.dev"
+# Базовий URL ФРОНТА (де відкривається застосунок) — воркер salary-app.
+site_url = "https://salary-app.crm-a10.workers.dev"
 # Точні URL, дозволені для редіректів після авторизації (dev + прод фронта).
 additional_redirect_urls = [
-  "http://localhost:5174",
-  "http://127.0.0.1:5174",
-  "https://payments-app.crm-a10.workers.dev",
-  "https://erp-ubpukraine-pay.com",
-  "https://www.erp-ubpukraine-pay.com",
+  "http://localhost:5175",
+  "http://127.0.0.1:5175",
+  "https://salary-app.crm-a10.workers.dev",
 ]
 jwt_expiry = 3600
 # Issuer посилань Auth (recovery/verify). Той самий api-домен за тунелем.
-jwt_issuer = "https://api.erp-ubpukraine-pay.com/auth/v1"
+# Розкоментувати разом із external_url.
+# jwt_issuer = "https://api.<домен>/auth/v1"
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_signup = true
