@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3248;
+    --accent: #6c63ff;
+    --accent2: #a78bfa;
+    --text: #e4e6f0;
+    --text2: #9098b5;
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --radius: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* SETUP SCREEN */
+  #setupScreen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: var(--shadow);
+  }
+  .setup-logo { font-size: 2rem; margin-bottom: 8px; }
+  .setup-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+  .setup-subtitle { font-size: 0.88rem; color: var(--text2); margin-bottom: 28px; line-height: 1.5; }
+  .setup-step {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+  .setup-step strong { color: var(--accent2); }
+  .setup-step code {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.8rem;
+    color: var(--green);
+    font-family: monospace;
+  }
+  .setup-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* HEADER */
+  #appScreen { display: none; }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .logo span { color: var(--accent2); }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  /* BUTTONS */
+  button { cursor: pointer; border: none; font-family: inherit; transition: all .15s; }
+  .btn { padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #5a52e0; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+  .btn-icon { padding: 6px; background: transparent; color: var(--text2); border-radius: 6px; border: 1px solid transparent; }
+  .btn-icon:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
+  .btn-danger { background: rgba(248,113,113,.15); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+  .btn-danger:hover { background: rgba(248,113,113,.25); }
+
+  /* LAYOUT */
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px; }
+
+  /* STATS */
+  .stats { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 20px; flex: 1; min-width: 120px; }
+  .stat-label { font-size: 0.72rem; color: var(--text2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .stat-value { font-size: 1.5rem; font-weight: 700; }
+
+  /* TOOLBAR */
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-pill { padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text2); transition: all .15s; }
+  .filter-pill.active, .filter-pill:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toolbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* COLLAPSED PAID */
+  details.paid-bundle { margin-bottom: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  details.paid-bundle > summary {
+    list-style: none; cursor: pointer; padding: 12px 16px; font-size: 0.88rem; font-weight: 700;
+    color: #7dd3fc; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; user-select: none;
+  }
+  details.paid-bundle > summary::-webkit-details-marker { display: none; }
+  details.paid-bundle > summary::before { content: '▸'; font-size: 0.75rem; opacity: 0.8; transition: transform .15s; }
+  details.paid-bundle[open] > summary::before { transform: rotate(90deg); }
+  details.paid-bundle > summary:hover { background: rgba(125, 211, 252, 0.06); }
+  .paid-bundle-inner { padding: 0 8px 10px; border-top: 1px solid var(--border); }
+
+  /* SETTINGS */
+  .settings-panel { display: none; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+  .settings-panel.open { display: block; }
+  .settings-title { font-size: 0.8rem; font-weight: 700; color: var(--text2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .06em; }
+  .status-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .status-item { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+  .status-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; cursor: pointer; border: 2px solid transparent; position: relative; }
+  .status-color-dot:hover { transform: scale(1.2); }
+  .status-name-input { flex: 1; background: transparent; border: none; padding: 0; font-size: 0.88rem; color: var(--text); font-family: inherit; outline: none; }
+
+  /* TASK TABLE */
+  .tasks-header { display: grid; grid-template-columns: 2fr 1.1fr 1fr 1.1fr 0.8fr 80px; gap: 12px; padding: 8px 16px; font-size: 0.72rem; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .task-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; transition: border-color .15s; cursor: pointer; }
+  .task-card:hover { border-color: var(--accent); }
+  .task-card.new-highlight { animation: highlight .8s ease-out; }
+  @keyframes highlight { 0%{background:rgba(108,99,255,.2);border-color:var(--accent);} 100%{background:var(--surface);border-color:var(--border);} }
+  .task-row { display: grid; grid-template-columns: 2fr 1.1fr 1fr 1.1fr 0.8fr 80px; gap: 12px; padding: 14px 16px; align-items: center; }
+  .task-title { font-weight: 600; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-tz { font-size: 0.78rem; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .task-bonus { font-weight: 700; color: var(--green); font-size: 0.88rem; }
+  .task-resp { font-size: 0.82rem; color: var(--text2); }
+  .task-actions { display: flex; gap: 4px; justify-content: flex-end; }
+
+  /* EMPTY */
+  .empty-state { text-align: center; padding: 64px 24px; color: var(--text2); }
+  .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 6px; }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 48px; color: var(--text2); font-size: 0.9rem; }
+  .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn .15s; }
+  @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow); animation: slideUp .2s; }
+  @keyframes slideUp { from{transform:translateY(20px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+  .modal-header { padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .modal-title { font-size: 1.1rem; font-weight: 700; }
+  .modal-body { padding: 0 24px 24px; }
+  .form-group { margin-bottom: 16px; }
+  label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+  input, textarea, select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.9rem; padding: 10px 14px; outline: none; transition: border-color .15s; }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 90px; }
+  select option { background: var(--surface2); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* TOAST */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; color: var(--text); font-size: 0.88rem; font-weight: 600; box-shadow: var(--shadow); z-index: 999; display: none; align-items: center; gap: 8px; max-width: 320px; }
+
+  /* PRIORITY */
+  .priority-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+  .p-critical { background: rgba(248,113,113,.18); color: #f87171; border: 1px solid rgba(248,113,113,.3); }
+  .p-high     { background: rgba(251,146,60,.18);  color: #fb923c; border: 1px solid rgba(251,146,60,.3); }
+  .p-medium   { background: rgba(251,191,36,.18);  color: #fbbf24; border: 1px solid rgba(251,191,36,.3); }
+  .p-low      { background: rgba(52,211,153,.18);  color: #34d399; border: 1px solid rgba(52,211,153,.3); }
+
+  /* COMMENTS */
+  .comments-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .comments-title { font-size: 0.78rem; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+  .comment-item { display: flex; gap: 10px; margin-bottom: 12px; }
+  .comment-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: var(--accent2); flex-shrink: 0; }
+  .comment-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; flex: 1; }
+  .comment-meta { font-size: 0.72rem; color: var(--text2); margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+  .comment-text { font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; }
+  .comment-del { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 0.75rem; padding: 0; opacity: 0; transition: opacity .15s; }
+  .comment-bubble:hover .comment-del { opacity: 1; }
+  .comment-del:hover { color: var(--red); }
+  .comment-input-row { display: flex; gap: 8px; margin-top: 10px; }
+  .comment-input-row input { flex: 1; height: 38px; font-size: 0.85rem; }
+  .comment-author-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .comment-author-row input { width: 160px; height: 34px; font-size: 0.82rem; }
+
+  /* RESPONSIVE */
+  @media (max-width: 700px) {
+    .tasks-header { display: none; }
+    .task-row { grid-template-columns: 1fr; gap: 8px; }
+    .task-actions { justify-content: flex-start; }
+    .form-row { grid-template-columns: 1fr; }
+    header { padding: 0 16px; }
+    .container { padding: 16px; }
+    .setup-card { padding: 28px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ SETUP SCREEN ═══════════════════ -->
+<div id="setupScreen">
+  <div class="setup-card">
+    <div class="setup-logo">📋</div>
+    <div class="setup-title">Task Tracker · Supabase</div>
+    <div class="setup-subtitle">Підключи свій безкоштовний Supabase-проєкт для реального часу та синхронізації між командою.</div>
+
+    <div class="setup-step">
+      <strong>Крок 1.</strong> Зайди на <strong>supabase.com</strong> → створи акаунт і новий проєкт.
+    </div>
+    <div class="setup-step">
+      <strong>Крок 2.</strong> У проєкті відкрий <strong>SQL Editor</strong> → вкопіюй SQL зі файлу <code>schema.sql</code> → виконай.
+    </div>
+    <div class="setup-step">
+      <strong>Крок 3.</strong> У <strong>Settings → General</strong> знайди <code>Project URL</code> (вигляду https://xxx.supabase.co). У <strong>Settings → API Keys</strong> скопіюй <code>Publishable key</code> (sb_publishable_...).
+    </div>
+
+    <hr class="setup-divider">
+
+    <div class="form-group">
+      <label>Project URL</label>
+      <input type="text" id="cfgUrl" placeholder="https://xxxxxxxxxxx.supabase.co">
+    </div>
+    <div class="form-group">
+      <label>Anon Public Key</label>
+      <input type="text" id="cfgKey" placeholder="sb_publishable_... або eyJhbGci...">
+    </div>
+    <div id="setupError" style="color:var(--red);font-size:0.85rem;margin-bottom:12px;display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:10px 14px;line-height:1.5"></div>
+    <button class="btn btn-primary" id="connectBtn" style="width:100%;justify-content:center;padding:12px" onclick="connectSupabase()">
+      🚀 Підключитись
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════ APP SCREEN ═══════════════════ -->
+<div id="appScreen">
+  <header>
+    <div class="logo">📋 <span>Task</span>Tracker <div class="live-dot" title="Live"></div></div>
+    <div class="header-right">
+      <span id="connectionInfo" style="font-size:0.78rem;color:var(--text2)"></span>
+      <button class="btn btn-ghost btn-sm" onclick="toggleSettings()">⚙️ Статуси</button>
+      <button class="btn btn-ghost btn-sm" onclick="disconnectSupabase()">🔌 Змінити БД</button>
+      <button class="btn btn-primary" onclick="openAddModal()">＋ Нова задача</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- SETTINGS -->
+    <div class="settings-panel" id="settingsPanel">
+      <div class="settings-title">Налаштування статусів</div>
+      <div class="status-list" id="statusList"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="addStatus()">＋ Додати статус</button>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats" id="statsBar"></div>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+      <div class="filters" id="filterBar"></div>
+      <div class="toolbar-right">
+        <button type="button" class="btn btn-ghost btn-sm" id="collapsePaidBtn" onclick="toggleCollapsePaid()" title="Згрупувати оплачені задачі">📥 Згорнути оплачені</button>
+        <input type="text" id="searchInput" placeholder="🔍 Пошук..." style="width:200px;height:36px;padding:6px 12px;font-size:0.85rem" oninput="renderTasks()">
+      </div>
+    </div>
+
+    <!-- HEADER -->
+    <div class="tasks-header">
+      <div>Задача</div>
+      <div>Статус</div>
+      <div>Пріоритет</div>
+      <div>Відповідальний</div>
+      <div>Бонус</div>
+      <div></div>
+    </div>
+
+    <!-- TASKS -->
+    <div id="taskList"><div class="loading"><div class="spinner"></div><br>Завантаження...</div></div>
+  </div>
+</div>
+
+<!-- ═══════════ TASK MODAL ═══════════ -->
+<div class="modal-overlay" id="taskModal" style="display:none" onclick="closeOnOverlay(event,'taskModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Нова задача</div>
+      <button class="btn-icon" onclick="closeModal('taskModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Назва задачі *</label>
+        <input type="text" id="f_title" placeholder="Що потрібно зробити?">
+      </div>
+      <div class="form-group">
+        <label>ТЗ / Опис</label>
+        <textarea id="f_tz" placeholder="Технічне завдання, деталі, вимоги..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Статус</label>
+          <select id="f_status"></select>
+        </div>
+        <div class="form-group">
+          <label>Відповідальний</label>
+          <input type="text" id="f_resp" placeholder="Ім'я або нікнейм" list="respList">
+          <datalist id="respList"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Пріоритет</label>
+          <select id="f_priority">
+            <option value="critical">🔴 Критичний</option>
+            <option value="high">🟠 Високий</option>
+            <option value="medium" selected>🟡 Середній</option>
+            <option value="low">🟢 Низький</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Бонус (₴)</label>
+          <input type="number" id="f_bonus" placeholder="0" min="0">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Дедлайн</label>
+          <input type="date" id="f_deadline">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('taskModal')">Скасувати</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveTask()">Зберегти</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ DETAIL MODAL ═══════════ -->
+<div class="modal-overlay" id="detailModal" style="display:none" onclick="closeOnOverlay(event,'detailModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="detailTitle" style="font-size:1rem;max-width:80%"></div>
+      <button class="btn-icon" onclick="closeModal('detailModal')">✕</button>
+    </div>
+    <div class="modal-body" id="detailContent"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const CONFIG_KEY = 'tt_supabase_config';
+
+let sbClient = null;
+let tasks = [];
+let statuses = [];
+let comments = [];
+
+const PRIORITY = {
+  critical: { label: '🔴 Критичний', cls: 'p-critical', order: 0 },
+  high:     { label: '🟠 Високий',   cls: 'p-high',     order: 1 },
+  medium:   { label: '🟡 Середній',  cls: 'p-medium',   order: 2 },
+  low:      { label: '🟢 Низький',   cls: 'p-low',      order: 3 },
+};
+function priorityBadge(p) {
+  const d = PRIORITY[p] || PRIORITY.medium;
+  return `<span class="priority-badge ${d.cls}">${d.label}</span>`;
+}
+let activeFilter = 'all';
+let editingId = null;
+let realtimeSub = null;
+let collapsePaid = localStorage.getItem('tt_collapse_paid') === '1';
+
+function isPaidTask(task) {
+  const s = getStatus(task.status_id);
+  return s && /оплачено|paid/i.test(s.name || '');
+}
+
+function toggleCollapsePaid() {
+  collapsePaid = !collapsePaid;
+  localStorage.setItem('tt_collapse_paid', collapsePaid ? '1' : '0');
+  renderTasks();
+}
+
+function updateCollapsePaidButton() {
+  const btn = document.getElementById('collapsePaidBtn');
+  if (!btn) return;
+  btn.textContent = collapsePaid ? '📤 Показати оплачені в списку' : '📥 Згорнути оплачені';
+  btn.title = collapsePaid
+    ? 'Показати оплачені змішано з іншими задачами'
+    : 'Зібрати усі оплачені в згорнутий блок унизу';
+}
+
+function statusFilterGroups() {
+  const groups = [];
+  const map = new Map();
+
+  for (const s of statuses) {
+    const rawName = (s?.name || '').trim();
+    const norm = rawName.toLowerCase();
+    const key = norm ? `name:${norm}` : `id:${s.id}`;
+
+    if (!map.has(key)) {
+      const group = {
+        id: key.startsWith('name:') ? `group:${encodeURIComponent(norm)}` : `status:${s.id}`,
+        name: rawName || 'Без назви',
+        statusIds: [s.id],
+      };
+      map.set(key, group);
+      groups.push(group);
+    } else {
+      map.get(key).statusIds.push(s.id);
+    }
+  }
+
+  return groups;
+}
+
+// ─── SETUP ───────────────────────────────────────────────────────────────────
+window.onload = () => {
+  const cfg = loadConfig();
+  if (cfg) {
+    initSupabase(cfg.url, cfg.key);
+  }
+};
+
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem(CONFIG_KEY)); } catch { return null; }
+}
+
+function saveConfig(url, key) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify({ url, key }));
+}
+
+async function connectSupabase() {
+  const url = document.getElementById('cfgUrl').value.trim();
+  const key = document.getElementById('cfgKey').value.trim();
+  hideSetupError();
+
+  if (!url || !key) { showSetupError('⚠️ Заповни обидва поля — URL і API Key.'); return; }
+  if (!url.startsWith('https://')) { showSetupError('⚠️ Project URL має починатись з https://'); return; }
+
+  const btn = document.getElementById('connectBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Підключення...';
+
+  await initSupabase(url, key, true);
+
+  btn.disabled = false;
+  btn.textContent = '🚀 Підключитись';
+}
+
+async function initSupabase(url, key, fromSetup = false) {
+  try {
+    // Перевіряємо чи завантажилась бібліотека Supabase
+    if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
+      if (fromSetup) showSetupError('❌ Бібліотека Supabase не завантажилась. Перевір інтернет-з\'єднання і перезавантаж сторінку.');
+      return;
+    }
+
+    sbClient = window.supabase.createClient(url, key);
+
+    // Тестуємо з'єднання
+    const { data, error } = await sbClient.from('statuses').select('id').limit(1);
+
+    if (error) {
+      let msg = '❌ Помилка: ' + error.message;
+      if (error.message.includes('relation') || error.message.includes('does not exist')) {
+        msg = '❌ Таблиці не знайдено. Переконайся що виконав schema.sql у Supabase SQL Editor.';
+      } else if (error.code === 'PGRST301' || error.message.includes('JWT')) {
+        msg = '❌ Невірний Anon Key. Скопіюй його ще раз з Project Settings → API.';
+      } else if (error.message.includes('fetch') || error.message.includes('network')) {
+        msg = '❌ Не вдалось з\'єднатись. Перевір Project URL.';
+      }
+      if (fromSetup) showSetupError(msg);
+      return;
+    }
+
+    saveConfig(url, key);
+    document.getElementById('setupScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+
+    const domain = new URL(url).hostname.split('.')[0];
+    document.getElementById('connectionInfo').textContent = '🟢 ' + domain;
+
+    await loadAll();
+    subscribeRealtime();
+
+  } catch(e) {
+    if (fromSetup) showSetupError('❌ Несподівана помилка: ' + e.message);
+  }
+}
+
+function showSetupError(msg) {
+  const el = document.getElementById('setupError');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function hideSetupError() {
+  document.getElementById('setupError').style.display = 'none';
+}
+
+function showSetupError(msg) {
+  const el = document.getElementById('setupError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function disconnectSupabase() {
+  if (!confirm('Відключитись від бази даних?')) return;
+  localStorage.removeItem(CONFIG_KEY);
+  if (realtimeSub) sbClient.removeChannel(realtimeSub);
+  location.reload();
+}
+
+// ─── DATA LOADING ─────────────────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([loadStatuses(), loadTasks(), loadComments()]);
+  render();
+}
+
+async function loadComments() {
+  const { data, error } = await sbClient.from('comments').select('*');
+  if (!error && data) comments = data;
+}
+
+async function loadStatuses() {
+  const { data, error } = await sbClient.from('statuses').select('*').order('position');
+  if (!error && data) statuses = data;
+  await ensurePaidStatusExists();
+}
+
+async function loadTasks() {
+  const { data, error } = await sbClient.from('tasks').select('*').order('created_at', { ascending: false });
+  if (!error && data) tasks = data;
+}
+
+// ─── REALTIME ─────────────────────────────────────────────────────────────────
+function subscribeRealtime() {
+  realtimeSub = sbClient
+    .channel('tt_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, async (payload) => {
+      if (payload.eventType === 'INSERT') {
+        if (!tasks.find(t => t.id === payload.new.id)) {
+          tasks.unshift(payload.new);
+          highlightTask(payload.new.id);
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = tasks.findIndex(t => t.id === payload.new.id);
+        if (idx !== -1) tasks[idx] = payload.new; else tasks.unshift(payload.new);
+      } else if (payload.eventType === 'DELETE') {
+        tasks = tasks.filter(t => t.id !== payload.old.id);
+      }
+      render();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'statuses' }, async () => {
+      await loadStatuses();
+      render();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, async (payload) => {
+      if (payload.eventType === 'INSERT') {
+        if (!comments.find(c => c.id === payload.new.id)) {
+          comments.push(payload.new);
+          // Якщо деталі відкриті для цієї задачі — оновлюємо
+          if (currentDetailTaskId === payload.new.task_id) {
+            const list = document.getElementById('commentsList');
+            if (list) {
+              if (list.querySelector('[style*="Поки немає"]')) list.innerHTML = '';
+              list.insertAdjacentHTML('beforeend', renderComment(payload.new));
+            }
+          }
+        }
+      } else if (payload.eventType === 'DELETE') {
+        comments = comments.filter(c => c.id !== payload.old.id);
+        document.getElementById('ci_' + payload.old.id)?.remove();
+      }
+      render();
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Realtime підключено');
+      } else if (status === 'CHANNEL_ERROR') {
+        console.warn('⚠️ Realtime недоступний, використовую polling');
+        startPolling();
+      }
+    });
+}
+
+// Fallback polling якщо realtime не працює
+let pollingInterval = null;
+function startPolling() {
+  if (pollingInterval) return;
+  pollingInterval = setInterval(async () => {
+    await loadAll();
+  }, 5000);
+}
+
+let pendingHighlight = null;
+function highlightTask(id) { pendingHighlight = id; }
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function render() {
+  renderStats();
+  renderFilters();
+  renderStatusSettings();
+  renderTasks();
+  populateStatusSelect();
+  populateRespDatalist();
+}
+
+function badgeStyle(status) {
+  if (!status) return '';
+  const c = status.color;
+  const r = parseInt(c.slice(1,3),16), g = parseInt(c.slice(3,5),16), b = parseInt(c.slice(5,7),16);
+  return `background:rgba(${r},${g},${b},.18);color:${c};border:1px solid rgba(${r},${g},${b},.35)`;
+}
+
+function getStatus(id) { return statuses.find(s => s.id === id) || null; }
+
+function renderStats() {
+  const total = tasks.length;
+  const isDoneTask = (task) => {
+    const s = getStatus(task.status_id);
+    return s && /виконано|done|complete/i.test(s.name);
+  };
+  const done = tasks.filter(t => isDoneTask(t) || isPaidTask(t)).length;
+  const doneBonus = tasks
+    .filter(isDoneTask)
+    .reduce((a, t) => a + (parseFloat(t.bonus) || 0), 0);
+  const paidBonus = tasks
+    .filter(isPaidTask)
+    .reduce((a, t) => a + (parseFloat(t.bonus) || 0), 0);
+  const totalBonus = tasks
+    .filter(t => !isPaidTask(t))
+    .reduce((a, t) => a + (parseFloat(t.bonus) || 0), 0);
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Всього задач</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Виконано (₴)</div><div class="stat-value" style="color:var(--green)">₴${doneBonus.toLocaleString('uk-UA')}</div></div>
+    <div class="stat-card"><div class="stat-label">Прогрес</div><div class="stat-value" style="color:var(--accent2)">${pct}%</div></div>
+    <div class="stat-card"><div class="stat-label">Сума бонусів (без оплачено)</div><div class="stat-value" style="color:var(--yellow)">₴${totalBonus.toLocaleString('uk-UA')}</div></div>
+    <div class="stat-card"><div class="stat-label">Оплачено (₴)</div><div class="stat-value" style="color:#7dd3fc">₴${paidBonus.toLocaleString('uk-UA')}</div></div>
+  `;
+}
+
+function renderFilters() {
+  const pills = [{ id: 'all', name: 'Усі', statusIds: [] }, ...statusFilterGroups()];
+  document.getElementById('filterBar').innerHTML = pills.map(p =>
+    `<div class="filter-pill ${activeFilter===p.id?'active':''}" onclick="setFilter('${p.id}')">${escHtml(p.name)}</div>`
+  ).join('');
+}
+
+function uniqueStatusesByName() {
+  const map = new Map();
+  for (const s of statuses) {
+    const name = (s?.name || '').trim();
+    const key = name.toLowerCase();
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, s);
+  }
+  return [...map.values()];
+}
+
+async function ensurePaidStatusExists() {
+  const hasPaid = statuses.some(s => /оплачено|paid/i.test(s.name || ''));
+  if (hasPaid) return;
+
+  const maxPos = statuses.length ? Math.max(...statuses.map(s => Number(s.position) || 0)) : 0;
+  const { data, error } = await sbClient
+    .from('statuses')
+    .insert({ name: 'Оплачено', color: '#7dd3fc', position: maxPos + 1 })
+    .select()
+    .single();
+
+  if (!error && data && !statuses.find(s => s.id === data.id)) {
+    statuses.push(data);
+  }
+}
+
+function renderTaskCard(task) {
+  const s = getStatus(task.status_id);
+  const badge = s ? `<span class="status-badge" style="${badgeStyle(s)}">${escHtml(s.name)}</span>` : '<span style="color:var(--text2)">—</span>';
+  const bonus = task.bonus ? `₴${parseFloat(task.bonus).toLocaleString('uk-UA')}` : '—';
+  const commCount = comments.filter(c => c.task_id === task.id).length;
+  return `
+    <div class="task-card${pendingHighlight===task.id?' new-highlight':''}" id="tc_${task.id}" onclick="openDetail('${task.id}')">
+      <div class="task-row">
+        <div>
+          <div class="task-title">${escHtml(task.title)}${commCount ? `<span style="margin-left:6px;font-size:0.72rem;color:var(--text2)">💬${commCount}</span>` : ''}</div>
+          ${task.tz?`<div class="task-tz">${escHtml(task.tz.slice(0,60))}${task.tz.length>60?'…':''}</div>`:''}
+        </div>
+        <div>${badge}</div>
+        <div>${priorityBadge(task.priority)}</div>
+        <div class="task-resp">${escHtml(task.responsible||'—')}</div>
+        <div class="task-bonus">${bonus}</div>
+        <div class="task-actions" onclick="event.stopPropagation()">
+          <button class="btn-icon" title="Редагувати" onclick="openEditModal('${task.id}')">✏️</button>
+          <button class="btn-icon" title="Видалити" onclick="deleteTask('${task.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderTasks() {
+  updateCollapsePaidButton();
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  let list = tasks;
+  if (activeFilter !== 'all') {
+    if (activeFilter.startsWith('status:')) {
+      const statusId = activeFilter.slice('status:'.length);
+      list = list.filter(t => t.status_id === statusId);
+    } else {
+      const group = statusFilterGroups().find(g => g.id === activeFilter);
+      if (group) {
+        const ids = new Set(group.statusIds);
+        list = list.filter(t => ids.has(t.status_id));
+      } else {
+        list = [];
+      }
+    }
+  }
+  if (search) list = list.filter(t =>
+    t.title.toLowerCase().includes(search) ||
+    (t.tz||'').toLowerCase().includes(search) ||
+    (t.responsible||'').toLowerCase().includes(search)
+  );
+
+  const el = document.getElementById('taskList');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><h3>Задач немає</h3><p>Натисни «＋ Нова задача» щоб почати</p></div>`;
+    return;
+  }
+
+  const sortList = (arr) => {
+    arr.sort((a,b) => {
+      const pa = (PRIORITY[a.priority]||PRIORITY.medium).order;
+      const pb = (PRIORITY[b.priority]||PRIORITY.medium).order;
+      if (pa !== pb) return pa - pb;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+  };
+  sortList(list);
+
+  let html = '';
+  if (collapsePaid) {
+    const unpaid = list.filter(t => !isPaidTask(t));
+    const paid = list.filter(isPaidTask);
+    html = unpaid.map(renderTaskCard).join('');
+    if (paid.length) {
+      const paidSum = paid.reduce((a, t) => a + (parseFloat(t.bonus) || 0), 0);
+      sortList(paid);
+      html += `
+      <details class="paid-bundle">
+        <summary>
+          <span>Оплачено · ${paid.length}</span>
+          <span style="font-weight:600;opacity:.9">₴${paidSum.toLocaleString('uk-UA')}</span>
+          <span style="margin-left:auto;font-size:0.78rem;font-weight:600;opacity:.65">розгорнути список</span>
+        </summary>
+        <div class="paid-bundle-inner">
+          ${paid.map(renderTaskCard).join('')}
+        </div>
+      </details>`;
+    }
+  } else {
+    html = list.map(renderTaskCard).join('');
+  }
+
+  el.innerHTML = html;
+
+  if (pendingHighlight) { pendingHighlight = null; }
+}
+
+function renderStatusSettings() {
+  document.getElementById('statusList').innerHTML = statuses.map(s => `
+    <div class="status-item">
+      <div class="status-color-dot" style="background:${s.color}" onclick="document.getElementById('cp_${s.id}').click()" title="Колір"></div>
+      <input type="color" id="cp_${s.id}" style="display:none;width:0;height:0;opacity:0;position:absolute" value="${s.color}" onchange="updateStatusColor('${s.id}',this.value)">
+      <input class="status-name-input" id="sni_${s.id}" value="${escHtml(s.name)}" onchange="updateStatusName('${s.id}',this.value)" placeholder="Назва статусу">
+      <button class="btn-icon" onclick="removeStatus('${s.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+// ─── STATUS CRUD ──────────────────────────────────────────────────────────────
+function toggleSettings() { document.getElementById('settingsPanel').classList.toggle('open'); }
+
+async function addStatus() {
+  const colors = ['#f87171','#fb923c','#fbbf24','#a3e635','#34d399','#22d3ee','#60a5fa','#a78bfa','#f472b6'];
+  const color = colors[statuses.length % colors.length];
+  const newStatus = { name: '', color, position: statuses.length };
+  const { data, error } = await sbClient.from('statuses').insert(newStatus).select().single();
+  if (error) { showToast('❌ Помилка: ' + error.message); return; }
+  if (data && !statuses.find(s => s.id === data.id)) statuses.push(data);
+  render();
+  // Одразу фокусуємо поле імені нового статусу
+  const input = document.getElementById('sni_' + (data && data.id));
+  if (input) { input.focus(); input.select(); }
+}
+
+async function removeStatus(id) {
+  if (statuses.length <= 1) return showToast('⚠️ Має бути хоча б один статус');
+  if (!confirm('Видалити статус? Задачі з цим статусом залишаться без статусу.')) return;
+  const { error } = await sbClient.from('statuses').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message); return; }
+  statuses = statuses.filter(s => s.id !== id);
+  if (activeFilter === id) activeFilter = 'all';
+  render();
+}
+
+async function updateStatusName(id, val) {
+  const s = statuses.find(x => x.id === id);
+  if (s) s.name = val;
+  await sbClient.from('statuses').update({ name: val }).eq('id', id);
+  renderFilters();
+}
+
+async function updateStatusColor(id, color) {
+  const s = statuses.find(x => x.id === id);
+  if (s) s.color = color;
+  render();
+  await sbClient.from('statuses').update({ color }).eq('id', id);
+}
+
+// ─── TASK CRUD ────────────────────────────────────────────────────────────────
+function populateStatusSelect(selected) {
+  const uniqueStatuses = uniqueStatusesByName();
+  const resolvedSelected = selected && uniqueStatuses.some(s => s.id === selected)
+    ? selected
+    : (uniqueStatuses[0]?.id || '');
+  document.getElementById('f_status').innerHTML = uniqueStatuses.map(s =>
+    `<option value="${s.id}" ${resolvedSelected===s.id?'selected':''}>${escHtml(s.name)}</option>`
+  ).join('');
+  if (resolvedSelected) document.getElementById('f_status').value = resolvedSelected;
+}
+
+function populateRespDatalist() {
+  const names = [...new Set(tasks.map(t=>t.responsible).filter(Boolean))];
+  document.getElementById('respList').innerHTML = names.map(n=>`<option value="${escHtml(n)}">`).join('');
+}
+
+function setFilter(id) { activeFilter = id; renderFilters(); renderTasks(); }
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Нова задача';
+  ['f_title','f_tz','f_resp','f_bonus','f_deadline'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f_priority').value = 'medium';
+  populateStatusSelect(statuses[0]?.id);
+  document.getElementById('taskModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('f_title').focus(), 100);
+}
+
+function openEditModal(id) {
+  const t = tasks.find(x=>x.id===id);
+  if (!t) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'Редагувати задачу';
+  document.getElementById('f_title').value = t.title;
+  document.getElementById('f_tz').value = t.tz || '';
+  document.getElementById('f_resp').value = t.responsible || '';
+  document.getElementById('f_bonus').value = t.bonus || '';
+  document.getElementById('f_deadline').value = t.deadline || '';
+  document.getElementById('f_priority').value = t.priority || 'medium';
+  populateStatusSelect(t.status_id);
+  document.getElementById('taskModal').style.display = 'flex';
+}
+
+async function saveTask() {
+  const title = document.getElementById('f_title').value.trim();
+  if (!title) { showToast('⚠️ Вкажи назву задачі'); return; }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Збереження...';
+
+  const data = {
+    title,
+    tz: document.getElementById('f_tz').value.trim() || null,
+    status_id: document.getElementById('f_status').value || null,
+    responsible: document.getElementById('f_resp').value.trim() || null,
+    bonus: parseFloat(document.getElementById('f_bonus').value) || null,
+    deadline: document.getElementById('f_deadline').value || null,
+    priority: document.getElementById('f_priority').value || 'medium',
+    updated_at: new Date().toISOString(),
+  };
+
+  let error, saved;
+  if (editingId) {
+    const res = await sbClient.from('tasks').update(data).eq('id', editingId).select().single();
+    error = res.error; saved = res.data;
+    if (!error && saved) {
+      const idx = tasks.findIndex(t => t.id === editingId);
+      if (idx !== -1) tasks[idx] = saved;
+    }
+  } else {
+    const res = await sbClient.from('tasks').insert(data).select().single();
+    error = res.error; saved = res.data;
+    if (!error && saved && !tasks.find(t => t.id === saved.id)) tasks.unshift(saved);
+  }
+
+  btn.disabled = false; btn.textContent = 'Зберегти';
+
+  if (error) { showToast('❌ ' + error.message); return; }
+  closeModal('taskModal');
+  render();
+  showToast(editingId ? '✅ Задачу оновлено' : '✅ Задачу додано');
+}
+
+async function deleteTask(id) {
+  if (!confirm('Видалити цю задачу?')) return;
+  const { error } = await sbClient.from('tasks').delete().eq('id', id);
+  if (error) { showToast('❌ ' + error.message); return; }
+  tasks = tasks.filter(t => t.id !== id);
+  render();
+  showToast('🗑️ Задачу видалено');
+}
+
+async function openDetail(id) {
+  const t = tasks.find(x=>x.id===id);
+  if (!t) return;
+  currentDetailTaskId = id;
+
+  // Завантажуємо коментарі для цієї задачі
+  const { data: taskComments } = await sbClient.from('comments').select('*').eq('task_id', id).order('created_at');
+  comments = comments.filter(c => c.task_id !== id);
+  if (taskComments) comments.push(...taskComments);
+
+  renderDetailModal(id);
+  document.getElementById('detailModal').style.display = 'flex';
+}
+
+let currentDetailTaskId = null;
+
+function renderDetailModal(id) {
+  const t = tasks.find(x=>x.id===id);
+  if (!t) return;
+  const s = getStatus(t.status_id);
+  const badge = s ? `<span class="status-badge" style="${badgeStyle(s)};font-size:0.85rem;padding:6px 14px">${escHtml(s.name)}</span>` : '';
+  const taskComments = comments.filter(c => c.task_id === id).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const savedAuthor = localStorage.getItem('tt_author') || '';
+
+  document.getElementById('detailTitle').textContent = t.title;
+  document.getElementById('detailContent').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      ${badge}
+      ${priorityBadge(t.priority)}
+    </div>
+    ${t.tz?`<div style="margin-bottom:16px">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📄 ТЗ / Опис</div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:0.88rem;line-height:1.7;white-space:pre-wrap">${escHtml(t.tz)}</div>
+    </div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="font-size:0.7rem;color:var(--text2);margin-bottom:4px;font-weight:700;text-transform:uppercase">👤 Відповідальний</div>
+        <div style="font-weight:600">${escHtml(t.responsible||'—')}</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="font-size:0.7rem;color:var(--text2);margin-bottom:4px;font-weight:700;text-transform:uppercase">💰 Бонус</div>
+        <div style="font-weight:700;color:var(--green);font-size:1.1rem">${t.bonus?'₴'+parseFloat(t.bonus).toLocaleString('uk-UA'):'—'}</div>
+      </div>
+      ${t.deadline?`<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+        <div style="font-size:0.7rem;color:var(--text2);margin-bottom:4px;font-weight:700;text-transform:uppercase">📅 Дедлайн</div>
+        <div style="font-weight:600">${new Date(t.deadline+'T00:00:00').toLocaleDateString('uk-UA',{day:'2-digit',month:'long',year:'numeric'})}</div>
+      </div>`:''}
+    </div>
+
+    <!-- КОМЕНТАРІ -->
+    <div class="comments-section">
+      <div class="comments-title">💬 Коментарі (${taskComments.length})</div>
+      <div id="commentsList">
+        ${taskComments.length ? taskComments.map(c => renderComment(c)).join('') : '<div style="color:var(--text2);font-size:0.85rem;text-align:center;padding:12px 0">Поки немає коментарів</div>'}
+      </div>
+      <div class="comment-author-row">
+        <input id="commentAuthor" type="text" placeholder="Ваше ім'я" value="${escHtml(savedAuthor)}" style="width:160px" oninput="localStorage.setItem('tt_author',this.value)">
+      </div>
+      <div class="comment-input-row">
+        <input id="commentInput" type="text" placeholder="Написати коментар..." onkeydown="if(event.key==='Enter')addComment('${t.id}')">
+        <button class="btn btn-primary btn-sm" onclick="addComment('${t.id}')">Надіслати</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;margin-top:8px;border-top:1px solid var(--border)">
+      <button class="btn btn-ghost" onclick="closeModal('detailModal')">Закрити</button>
+      <button class="btn btn-primary" onclick="closeModal('detailModal');openEditModal('${t.id}')">✏️ Редагувати</button>
+    </div>
+  `;
+}
+
+function renderComment(c) {
+  const initials = (c.author||'?').slice(0,2).toUpperCase();
+  const time = new Date(c.created_at).toLocaleString('uk-UA',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  return `
+  <div class="comment-item" id="ci_${c.id}">
+    <div class="comment-avatar">${escHtml(initials)}</div>
+    <div class="comment-bubble">
+      <div class="comment-meta">
+        <span style="font-weight:700;color:var(--text)">${escHtml(c.author||'Анонім')}</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span>${time}</span>
+          <button class="comment-del" onclick="deleteComment('${c.id}','${c.task_id}')" title="Видалити">✕</button>
+        </span>
+      </div>
+      <div class="comment-text">${escHtml(c.text)}</div>
+    </div>
+  </div>`;
+}
+
+async function addComment(taskId) {
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const author = document.getElementById('commentAuthor').value.trim() || 'Анонім';
+
+  input.disabled = true;
+  const { data, error } = await sbClient.from('comments').insert({ task_id: taskId, author, text }).select().single();
+  input.disabled = false;
+
+  if (error) { showToast('❌ ' + error.message); return; }
+  if (data) {
+    comments.push(data);
+    input.value = '';
+    // Оновлюємо список коментарів у модалці
+    const list = document.getElementById('commentsList');
+    if (list) {
+      if (list.querySelector('[style*="Поки немає"]')) list.innerHTML = '';
+      list.insertAdjacentHTML('beforeend', renderComment(data));
+      list.lastElementChild.scrollIntoView({ behavior: 'smooth' });
+    }
+    // Оновлюємо лічильник
+    const title = document.querySelector('.comments-title');
+    if (title) {
+      const cnt = comments.filter(c=>c.task_id===taskId).length;
+      title.textContent = `💬 Коментарі (${cnt})`;
+    }
+    render(); // оновлюємо лічильник у списку задач
+  }
+}
+
+async function deleteComment(commentId, taskId) {
+  const { error } = await sbClient.from('comments').delete().eq('id', commentId);
+  if (error) { showToast('❌ ' + error.message); return; }
+  comments = comments.filter(c => c.id !== commentId);
+  document.getElementById('ci_' + commentId)?.remove();
+  const title = document.querySelector('.comments-title');
+  if (title) {
+    const cnt = comments.filter(c=>c.task_id===taskId).length;
+    title.textContent = `💬 Коментарі (${cnt})`;
+  }
+  render();
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function closeOnOverlay(e, id) { if (e.target===e.currentTarget) closeModal(id); }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'flex';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.display='none', 2800);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+logs
+*.log
+npm-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Секрети та локальні env (у репо лише .env.example)
+.env
+.env.*
+!.env.example
+
+supabase/.temp/
