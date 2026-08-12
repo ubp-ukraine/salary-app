@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ListTodo, Loader2, Plus, X } from 'lucide-react';
+import { Check, ListTodo, Loader2, Plus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { PRIORITY_LABELS, type Priority, type Status, type Task } from '../types/db';
+import { PRIORITY_LABELS, type Participant, type Priority, type Status, type Task } from '../types/db';
+import { useAuth } from '../contexts/AuthContext';
 import { monthKey, monthLabel, uah } from '../lib/settlement';
 
 const emptyDraft = () => ({
@@ -27,8 +28,10 @@ const monthOptions = (): string[] => {
 };
 
 export function Tasks() {
+  const { session } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statuses, setStatuses] = useState<Status[]>([]);
+  const [me, setMe] = useState<Participant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<Task | null>(null);
@@ -39,14 +42,29 @@ export function Tasks() {
 
   const load = async () => {
     setLoading(true);
-    const [t, s] = await Promise.all([
+    const [t, s, p] = await Promise.all([
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
       supabase.from('statuses').select('*').order('position'),
+      supabase.from('participants').select('*'),
     ]);
     if (t.error || s.error) setError((t.error ?? s.error)!.message);
     setTasks((t.data as Task[]) ?? []);
     setStatuses((s.data as Status[]) ?? []);
+    // Хто я — визначаємо за email входу: user_id у рядках учасників не заповнюють руками.
+    const email = session?.user.email?.trim().toLowerCase() ?? '';
+    setMe(((p.data as Participant[]) ?? []).find(
+      (x) => (x.email ?? '').trim().toLowerCase() === email) ?? null);
     setLoading(false);
+  };
+
+  /** Перемикання відмітки затвердження. Сервер усе одно перевірить право (тригер). */
+  const toggleApproval = async (t: Task) => {
+    const { error: approveError } = await supabase
+      .from('tasks')
+      .update({ approved_at: t.approved_at ? null : new Date().toISOString() })
+      .eq('id', t.id);
+    if (approveError) setError(approveError.message);
+    else await load();
   };
 
   useEffect(() => { void load(); }, []);
@@ -167,6 +185,18 @@ export function Tasks() {
                       <span className="shrink-0 text-xs text-slate-400">
                         {t.settlement_month ? monthLabel(t.settlement_month) : 'без місяця'}
                       </span>
+                      {t.approved_at ? (
+                        <span
+                          title={`Затверджено ${new Date(t.approved_at).toLocaleDateString('uk-UA')}`}
+                          className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400"
+                        >
+                          <Check size={11} /> Затверджено
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-400">
+                          Очікує
+                        </span>
+                      )}
                       <span className="shrink-0 text-sm font-semibold text-emerald-400 tabular-nums">
                         {t.bonus ? uah(Number(t.bonus)) : '—'}
                       </span>
@@ -217,8 +247,22 @@ export function Tasks() {
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-1">
-              <button onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800">
+            <div className="flex items-center gap-2 pt-1">
+              {/* Апрув бачить лише той, у кого can_approve; сервер перевіряє це ще раз тригером. */}
+              {editing && me?.can_approve && (
+                <button
+                  onClick={() => { void toggleApproval(editing); setOpen(false); }}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium ${
+                    editing.approved_at
+                      ? 'border border-slate-700 text-slate-300 hover:bg-slate-800'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                  }`}
+                >
+                  <Check size={14} />
+                  {editing.approved_at ? 'Зняти затвердження' : 'Затвердити'}
+                </button>
+              )}
+              <button onClick={() => setOpen(false)} className="ml-auto rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800">
                 Скасувати
               </button>
               <button
